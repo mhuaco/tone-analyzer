@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(python -m pip install -r requirements.txt)",
+      "PowerShell(python -m py_compile app\\\\config.py app\\\\database.py app\\\\models.py app\\\\schemas.py app\\\\llm_analyzer.py app\\\\zendesk_client.py app\\\\main.py app\\\\monthly_job.py)"
+    ]
+  }
+}
