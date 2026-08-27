@@ -1,4 +1,3 @@
-import re
 from datetime import datetime
 
 import httpx
@@ -10,10 +9,6 @@ TONE_TAG_PREFIX = "tone_"
 TOPIC_TAG_PREFIX = "topic_"
 SCORED_TAG = "tone_scored"
 CHURN_RISK_TAG_PREFIX = "churn_risk_"
-
-
-def _slugify(value: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "_", value.strip().lower()).strip("_")
 
 
 async def get_ticket(ticket_id: int) -> dict:
@@ -73,7 +68,10 @@ async def update_ticket_tone(
 ) -> None:
     """Write the AI analysis onto the ticket itself: tone/topic as tags (replacing any
     previous analysis tags from an earlier pass on this same ticket), and the numeric/text
-    detail as custom fields so it can be filtered and reported on in Zendesk Explore."""
+    detail as custom fields so it can be filtered and reported on in Zendesk Explore.
+
+    component_tags must come from the fixed Topic vocabulary in app/schemas.py -- values are
+    already tag-safe (lowercase, underscored), so no slugifying happens here."""
     _require_field_ids()
 
     ticket = await get_ticket(ticket_id)
@@ -85,7 +83,7 @@ async def update_ticket_tone(
     new_tags = (
         kept_tags
         + [SCORED_TAG, f"{TONE_TAG_PREFIX}{tone_category}"]
-        + [f"{TOPIC_TAG_PREFIX}{_slugify(c)}" for c in component_tags]
+        + [f"{TOPIC_TAG_PREFIX}{c}" for c in component_tags]
     )
 
     payload = {

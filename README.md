@@ -26,7 +26,7 @@ FastAPI + the LLM call -- no database to provision, migrate, or back up.
 |---|---|
 | Tone category (positive/neutral/frustrated/angry) | Ticket tag: `tone_<category>` |
 | Marker that a ticket has been AI-scored at least once | Ticket tag: `tone_scored` |
-| Product/topic areas referenced | Ticket tags: `topic_<slug>` (one per topic) |
+| Product areas referenced | Ticket tags: `topic_<name>`, one per area, from a **fixed vocabulary** (see `Topic` in `app/schemas.py`): `gateway`, `dashboard`, `pump`, `sync`, `mdcb`, `operator`, `helm_charts`, `sso` (covers Identity Broker). The LLM can only pick from this list -- it can't invent new topic tags. An earlier freeform version was dropped because it produced near-duplicate tags across tickets (e.g. "export" vs "csv_export"), which fragments Explore reporting. Add a new area by extending the `Topic` literal in `schemas.py` *and* the matching enum in `llm_analyzer.py`'s `TONE_TOOL`. |
 | Frustration score (0-10), confidence (0-1), one-line summary, analyzed date | Ticket custom fields (created by `scripts/setup_zendesk_fields.py`) |
 | Per-org churn risk (LOW/MEDIUM/HIGH) | Organization tag: `churn_risk_<level>` |
 | Per-org product confidence, "why" bullets, last-updated date | Organization custom fields |
@@ -42,8 +42,9 @@ triggers, and automations all work against them directly -- no export or sync st
    product_confidence (0-10), and "why" bullets. Computed stats + LLM reasoning, merged by `org_id`.
    Orgs with fewer than `MIN_TICKETS_FOR_ORG_INSIGHT` (default 3) tickets get stats but no risk
    call -- not enough signal to avoid false positives.
-3. **Product** -- per-component (e.g. "saml") ticket count, avg frustration, orgs affected, trend,
-   and common_themes. Same computed-stats + LLM-reasoning merge, by component name.
+3. **Product** -- per-component (e.g. "gateway", "sso") ticket count, avg frustration, orgs
+   affected, trend, and common_themes. Same computed-stats + LLM-reasoning merge, by component
+   name, drawn from the fixed `topic_*` vocabulary (see "Where the data lives" above).
 
 This mirrors the two audiences from the original brief: customer-health rows are what you'd feed
 to CS/commercial (Slack `SLACK_WEBHOOK_CS`); product-health rows are what you'd feed to

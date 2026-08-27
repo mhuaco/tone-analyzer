@@ -5,15 +5,21 @@ from pydantic import BaseModel, Field
 ToneCategory = Literal["positive", "neutral", "frustrated", "angry"]
 ChurnRisk = Literal["LOW", "MEDIUM", "HIGH"]
 
+# Fixed topic vocabulary -- deliberately closed, not freeform. An earlier freeform version
+# produced near-duplicate tags across tickets (e.g. "export" vs "csv_export"), which
+# fragmented Explore reporting. Extend this list (and TONE_TOOL's matching enum in
+# llm_analyzer.py) when a new product area needs tracking; don't let the model invent one.
+Topic = Literal["gateway", "dashboard", "pump", "sync", "mdcb", "operator", "helm_charts", "sso"]
+
 
 class ToneAnalysisResult(BaseModel):
     """Structured output from per-ticket LLM scoring."""
 
     frustration_score: float = Field(..., ge=0.0, le=10.0, description="0 = delighted, 10 = extremely frustrated/angry")
     tone_category: ToneCategory
-    component_tags: list[str] = Field(
+    component_tags: list[Topic] = Field(
         default_factory=list,
-        description="Product areas/features/workflows referenced, e.g. 'saml', 'authentication', 'billing'",
+        description="Product areas referenced, from the fixed Topic vocabulary. Empty if none clearly apply.",
     )
     key_signals: list[str] = Field(
         default_factory=list,

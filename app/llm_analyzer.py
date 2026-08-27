@@ -21,8 +21,14 @@ TONE_TOOL = {
             },
             "component_tags": {
                 "type": "array",
-                "items": {"type": "string"},
-                "description": "Product areas/features/workflows referenced, e.g. 'saml', 'authentication', 'billing'",
+                "items": {
+                    "type": "string",
+                    "enum": ["gateway", "dashboard", "pump", "sync", "mdcb", "operator", "helm_charts", "sso"],
+                },
+                "description": (
+                    "Product areas clearly referenced, from this fixed list only -- do not invent others. "
+                    "'sso' covers Identity Broker. Leave empty if none of these are clearly involved."
+                ),
             },
             "key_signals": {
                 "type": "array",
@@ -44,7 +50,9 @@ frustration_score when the language clearly supports it, not merely because an i
 reported. A customer calmly reporting a bug is not automatically 'frustrated' -- reserve \
 that category for tickets with clear emotional signal (repeated escalation, expressions of \
 concern about reliability, explicit frustration language, etc). Paraphrase supporting \
-evidence in key_signals -- do not copy exact customer wording."""
+evidence in key_signals -- do not copy exact customer wording. For component_tags, only pick \
+from the fixed list given in the tool schema, and only when a topic is clearly involved -- \
+never guess, and never tag more than one or two unless the ticket genuinely spans them."""
 
 
 def analyze_ticket_tone(transcript: str) -> ToneAnalysisResult:
