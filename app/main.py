@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import hmac
 import base64
@@ -35,7 +36,10 @@ async def process_ticket(ticket_id: int) -> None:
     comments = await get_ticket_comments(ticket_id)
     transcript = build_transcript(ticket, comments)
 
-    result = analyze_ticket_tone(transcript)
+    # analyze_ticket_tone wraps the synchronous Anthropic client, so calling it directly
+    # would block this event loop -- and background tasks share the loop serving requests,
+    # stalling every other webhook and /health for the duration of the LLM call.
+    result = await asyncio.to_thread(analyze_ticket_tone, transcript)
 
     await update_ticket_tone(
         ticket_id,

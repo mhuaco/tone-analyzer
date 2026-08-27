@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 import anthropic
 
 from app.config import settings
+from app.llm_analyzer import tool_input
 from app.schemas import MonthlySynthesisResult
 from app.slack_client import post_monthly_report
 from app.zendesk_client import (
@@ -14,6 +15,7 @@ from app.zendesk_client import (
     TOPIC_TAG_PREFIX,
     extract_renewal_date,
     get_organization,
+    require_field_ids,
     search_scored_tickets,
     update_organization_health,
 )
@@ -39,7 +41,14 @@ SYNTHESIS_TOOL = {
                     "properties": {
                         "org_id": {"type": "integer"},
                         "churn_risk": {"type": "string", "enum": ["LOW", "MEDIUM", "HIGH"]},
-                        "product_confidence": {"type": "number", "description": "0 to 10"},
+                        # Bounded so the model can't quietly answer on a 0-1 scale: 0.85
+                        # passes Pydantic's 0-10 check and then renders as "0.9/10 confidence".
+                        "product_confidence": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 10,
+                            "description": "0 to 10, where 10 = fully confident in the product",
+                        },
                         "why": {"type": "array", "items": {"type": "string"}},
                     },
                     "required": ["org_id", "churn_risk", "product_confidence", "why"],
@@ -256,8 +265,7 @@ def synthesize(company_stats: dict, org_stats: list[dict], component_stats: list
             }
         ],
     )
-    tool_use_block = next(b for b in response.content if b.type == "tool_use")
-    return MonthlySynthesisResult(**tool_use_block.input)
+    return MonthlySynthesisResult(**tool_input(response, "record_monthly_synthesis"))
 
 
 def _risk_emoji(risk: str) -> str:
@@ -323,6 +331,11 @@ def render_report(period_start: datetime, company_stats: dict, customer_health: 
 
 
 async def run_monthly_report(reference: datetime | None = None) -> str:
+    # _parse_ticket looks tickets' custom fields up by these IDs. Unset, every lookup is
+    # keyed on None, matches nothing, and the run renders a clean-looking empty report
+    # instead of failing -- so check before spending any API calls.
+    require_field_ids()
+
     period_start, period_end, prior_start, prior_end = _period_bounds(reference)
     rows = await _fetch_rows(period_start, period_end)
     prior_rows = await _fetch_rows(prior_start, prior_end)

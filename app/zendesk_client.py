@@ -29,17 +29,29 @@ def build_transcript(ticket: dict, comments: list[dict]) -> str:
     """Flatten ticket + comments into a readable transcript for the LLM.
     Keeps public comments only by default (skip internal agent notes) so we're
     scoring customer-facing exchanges, not internal agent chatter.
+
+    Authorship is decided against the ticket's requester, not its assignee: only the
+    requester is the customer whose tone we score, and everyone else on a public comment
+    (assignee, a second agent, a collaborator) is support. Keying off the assignee instead
+    mislabelled every agent reply that didn't come from the currently assigned agent -- and
+    every assignee reply that arrived by email rather than the web client -- as `[Customer]`,
+    which fed agent apologies and escalation language into the frustration score.
     """
+    requester_id = ticket.get("requester_id")
     lines = [f"Subject: {ticket.get('subject', '(no subject)')}"]
     for c in comments:
         if not c.get("public", True):
             continue
-        author = "Agent" if c.get("via", {}).get("channel") == "web" and c.get("author_id") == ticket.get("assignee_id") else "Customer"
+        author = "Customer" if c.get("author_id") == requester_id else "Agent"
         lines.append(f"[{author}]: {c.get('plain_body', c.get('body', ''))}")
     return "\n\n".join(lines)
 
 
-def _require_field_ids() -> None:
+def require_field_ids() -> None:
+    """Fail loudly if the four custom field IDs aren't configured. Both the write path
+    (update_ticket_tone) and the read path (the monthly job) depend on them: without them
+    the monthly job looks up custom fields by a None id, matches nothing, and silently
+    renders an empty report rather than erroring."""
     missing = [
         name
         for name, value in [
@@ -72,7 +84,7 @@ async def update_ticket_tone(
 
     component_tags must come from the fixed Topic vocabulary in app/schemas.py -- values are
     already tag-safe (lowercase, underscored), so no slugifying happens here."""
-    _require_field_ids()
+    require_field_ids()
 
     ticket = await get_ticket(ticket_id)
     kept_tags = [
