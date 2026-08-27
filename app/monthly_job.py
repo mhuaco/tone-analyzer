@@ -30,6 +30,9 @@ TONE_CATEGORIES = ("positive", "neutral", "frustrated", "angry")
 SYNTHESIS_TOOL = {
     "name": "record_monthly_synthesis",
     "description": "Record churn-risk and product-friction insights from pre-aggregated ticket tone stats.",
+    # See the note on TONE_TOOL in llm_analyzer.py: without strict the API doesn't enforce this
+    # schema, so a list-typed field can come back as a string and fail in Pydantic instead.
+    "strict": True,
     "input_schema": {
         "type": "object",
         "properties": {
@@ -41,17 +44,17 @@ SYNTHESIS_TOOL = {
                     "properties": {
                         "org_id": {"type": "integer"},
                         "churn_risk": {"type": "string", "enum": ["LOW", "MEDIUM", "HIGH"]},
-                        # Bounded so the model can't quietly answer on a 0-1 scale: 0.85
-                        # passes Pydantic's 0-10 check and then renders as "0.9/10 confidence".
+                        # Scale is spelled out in the description because strict mode rejects
+                        # numeric minimum/maximum -- otherwise the model can quietly answer on a
+                        # 0-1 scale and 0.85 renders as "0.9/10 confidence".
                         "product_confidence": {
                             "type": "number",
-                            "minimum": 0,
-                            "maximum": 10,
                             "description": "0 to 10, where 10 = fully confident in the product",
                         },
                         "why": {"type": "array", "items": {"type": "string"}},
                     },
                     "required": ["org_id", "churn_risk", "product_confidence", "why"],
+                    "additionalProperties": False,
                 },
             },
             "component_insights": {
@@ -63,10 +66,12 @@ SYNTHESIS_TOOL = {
                         "common_themes": {"type": "array", "items": {"type": "string"}},
                     },
                     "required": ["component", "common_themes"],
+                    "additionalProperties": False,
                 },
             },
         },
         "required": ["overall_summary", "org_insights", "component_insights"],
+        "additionalProperties": False,
     },
 }
 

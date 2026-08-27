@@ -8,16 +8,21 @@ client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
 TONE_TOOL = {
     "name": "record_tone_analysis",
     "description": "Record structured tone analysis for a customer support ticket.",
+    # Without strict, the schema below is only a hint -- the model returned key_signals as a
+    # comma-joined string instead of an array and the tool call came back "successful", failing
+    # later in Pydantic. strict makes the API guarantee tool_use.input matches this schema, which
+    # is also what gives the component_tags enum any real force. It requires
+    # additionalProperties: false and every property listed in `required`.
+    "strict": True,
     "input_schema": {
         "type": "object",
         "properties": {
-            # Ranges are declared here, not only in the descriptions, so the API constrains
-            # the model to what app/schemas.py will actually accept -- a stray 95 for a 0-1
-            # confidence used to sail through the tool call and die in Pydantic validation.
+            # Ranges live in the description, not as minimum/maximum: strict mode rejects
+            # numeric bounds ("For 'number' type, properties maximum, minimum are not
+            # supported"), and without strict the API never enforced them anyway. Pydantic
+            # still bounds-checks these in app/schemas.py.
             "frustration_score": {
                 "type": "number",
-                "minimum": 0,
-                "maximum": 10,
                 "description": "0 (delighted) to 10 (extremely frustrated/angry)",
             },
             "tone_category": {
@@ -40,10 +45,20 @@ TONE_TOOL = {
                 "items": {"type": "string"},
                 "description": "Short paraphrased phrases (not verbatim quotes) supporting the score",
             },
-            "confidence": {"type": "number", "minimum": 0, "maximum": 1, "description": "0.0 to 1.0"},
+            "confidence": {"type": "number", "description": "0.0 to 1.0"},
             "summary": {"type": "string"},
         },
-        "required": ["frustration_score", "tone_category", "confidence", "summary"],
+        # strict requires every property here. component_tags/key_signals stay semantically
+        # optional -- the model returns [] for them, which app/schemas.py already defaults to.
+        "required": [
+            "frustration_score",
+            "tone_category",
+            "component_tags",
+            "key_signals",
+            "confidence",
+            "summary",
+        ],
+        "additionalProperties": False,
     },
 }
 
